@@ -28,4 +28,4 @@ Special thanks to Aaron Littman and Jacob Kaplan for advice in working with UCR 
 
 # Notebooks
 
-* [Interactive exploratory county map](http://wpinvestigative.github.io/sheriffs_287g/outputs/findings/01_analysis.html) - Exploratory analysis
+* [Analysis](http://wpinvestigative.github.io/sheriffs_287g/outputs/findings/01_analysis.html) - Exploratory analysis
