@@ -33,7 +33,12 @@ employees_last <- employees %>%
 arrests <- read_csv("../../data/raw_data/ucr_agencies_arrests_2019.csv")
 
 # load crosswalk data from Inter-university Consortium for Political and Social Research
+
+# To proceed, download the crosswalk zip folder from the link below
 # https://www.icpsr.umich.edu/web/NACJD/studies/35158
+# And unzip the folder into the `data/raw_data` folder
+# then you can run this successfully
+
 load("../../data/raw_data/ICPSR_35158/DS0001/35158-0001-Data.rda")
 
 # save it as crosswalk dataframe
