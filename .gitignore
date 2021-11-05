@@ -1,0 +1,52 @@
+api_key.R
+
+data/raw_data/287g for Andrew5.xlsx
+data/raw_data/287g for Andrew4.xlsx
+data/raw_data/287g for Andrew3.xlsx
+data/raw_data/287g for Andrew2.xlsx
+data/raw_data/287g for Andrew.xlsx
+data/raw_data/ucr_agencies_arrests_demo_2019.csv
+data/raw_data/ucr_agencies_arrests_2018.csv
+data/raw_data/ucr_agencies_employees_2018.csv
+data/raw_data/rural_urban_designations.csv
+outputs/summarized_data/
+data/raw_data/ICPSR_35158/
+
+# .ds_store
+.DS_Store
+
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+
+# Example code in package build process
+*-Ex.R
+
+# Output files from R CMD build
+/*.tar.gz
+
+# Output files from R CMD check
+/*.Rcheck/
+
+# RStudio files
+.Rproj.user/
+
+# produced vignettes
+vignettes/*.html
+vignettes/*.pdf
+
+# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+.httr-oauth
+
+# knitr and R markdown default cache directories
+/*_cache/
+/cache/
+
+# Temporary files created by R markdown
+*.utf8.md
+*.knit.md
+
+.Rproj.user

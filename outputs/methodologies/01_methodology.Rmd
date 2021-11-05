@@ -1,0 +1,563 @@
+---
+title: "Methodology"
+author: Andrew Ba Tran
+output: html_document
+---
+
+```{r setup, warning=F, message=F}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(warning = F)
+knitr::opts_chunk$set(message=F)
+
+library(tidyverse)
+library(DT)
+
+```
+
+```{r code1}
+library(tidyverse)
+library(readxl)
+library(fbi)
+
+# run this script to pull data from the FBI API
+#Source("scripts/import/01_fbi_ucr_import.R")
+
+# Load data from FBI UCR
+
+# employees data by agency and year from FBI's UCR data
+employees <- read_csv("../../data/raw_data/ucr_agencies_employees.csv")
+
+glimpse(employees)
+```
+
+```{r code2}
+# arrests data by agency and year from FBI's UCR data
+arrests <- read_csv("../../data/raw_data/ucr_agencies_arrests.csv")
+
+glimpse(arrests)
+```
+
+```{r code3}
+# load crosswalk data tgat addds socio-economic data to ori codes
+# and also designations on whether or not a department is local police or a sheriffs agency
+# from https://www.icpsr.umich.edu/web/NACJD/studies/35158
+load("../../data/raw_data/ICPSR_35158/DS0001/35158-0001-Data.rda")
+
+# save it as crosswalk dataframe
+crosswalk <- da35158.0001
+
+# remove the preloaded data
+rm(da35158.0001)
+
+# there are only 138 sheriffs agencies that debbie identified as working with ice and the 287g program
+glimpse(crosswalk)
+```
+
+```{r code4}
+#### summarize ----
+
+# limiting the universe to data later than 2010
+
+emp <- employees %>% 
+  # filter on later than 2010
+  filter(year>=2010)
+
+# joining number of employees to arrests data
+joined <- emp %>% 
+  left_join(arrests)
+
+# joining with the crosswalk data
+joined <- joined %>% 
+  left_join(crosswalk, by=c("ori"="ORI9")) %>% 
+  # filtering out rows that reported no arrests
+  filter(!is.na(all_other_offenses)) %>% 
+  # filters out 4,990 agencies that did not submit employee count info
+  filter(!is.na(officers_total)) %>% 
+  # filtering out weird outlier
+  filter(ori!="IN0080100" | year!=2013)
+
+# replacing NAs with zeroes now
+joined$all_other_offenses <- ifelse(is.na(joined$all_other_offenses),  0, joined$all_other_offenses)
+joined$drug_grand_total <- ifelse(is.na(joined$drug_grand_total), 0, joined$drug_grand_total)
+joined$simple_assault <- ifelse(is.na(joined$simple_assault), 0, joined$simple_assault)
+joined$dui <- ifelse(is.na(joined$dui), 0, joined$dui)
+joined$larceny <- ifelse(is.na(joined$larceny), 0, joined$larceny)
+joined$aggravated_assault <- ifelse(is.na(joined$aggravated_assault), 0, joined$aggravated_assault)
+joined$drunkness <- ifelse(is.na(joined$drunkness), 0, joined$drunkness)
+joined$burglary <- ifelse(is.na(joined$burglary), 0, joined$burglary)
+
+glimpse(joined)
+
+```
+
+```{r code5}
+# summarizing types of arrests by agency/year
+# arrests_all, arrests_old, low_level_arrests
+
+
+# Low level arrests are categorized as arrests from
+## vandalism
+## liquor_laws
+## drunkness
+## gambling_total
+## suspicion 
+## disorderly_conduct 
+## all_other_offenses
+
+joined <- joined %>% 
+  mutate(arrests_all=aggravated_assault +
+           all_other_offenses +
+           burglary +
+           curfew +
+           disorderly_conduct +
+           dui +
+           drug_grand_total+
+           drunkness +
+           embezzlement +
+           forgery+
+           fraud+
+           gambling_total +
+           human_trafficking_commercial_sex_traffic +
+           human_trafficking_servitude+
+           larceny +
+           liquor_laws +
+           manslaughter +
+           motor_vehicle_theft +
+           murder +
+           offense_against_family +
+           prostitution_total +
+           rape +
+           robbery +
+           other_sex_offenses +
+           simple_assault +
+           stolen_property +
+           suspicion +
+           vagrancy +
+           vandalism +
+           weapons,
+         arrests_old=all_other_offenses+
+           drug_grand_total+
+           simple_assault+
+           dui+ larceny+
+           aggravated_assault+
+           drunkness,
+         low_level_arrests=
+           vandalism+
+           liquor_laws+
+           drunkness+
+           gambling_total+
+           suspicion +
+           disorderly_conduct +
+           all_other_offenses
+  )
+
+# load in relationship file for 287g sheriffs agencies
+# has ori codes and T
+ice <- read_excel("../../data/raw_data/287g for Andrew.xlsx", sheet=1) %>% 
+  filter(!is.na(ori)) %>% 
+  mutate(ice=T) %>%
+  select(ori, ice)
+
+glimpse(ice)
+```
+
+```{r code6}
+# fbi agency employment and arrests totals joined with ice relationship file
+joined <- left_join(joined, ice)
+
+##### counties by year ----
+
+# counts up how many agencies and sheriffs agencies there are per
+#
+county_agency_count  <- joined %>% 
+  filter(AGCYTYPE=="(000) Local police department" |
+           AGCYTYPE=="(001) Sheriff's office" ) %>% 
+  #  filter(year>2013) %>% 
+  group_by(year, FIPS, AGCYTYPE) %>% 
+  summarize(agencies=n()) %>% 
+  pivot_wider(names_from="AGCYTYPE", values_from="agencies") %>% 
+  rename(police_agencies=`(000) Local police department`,
+         sheriff_agencies=`(001) Sheriff's office`) 
+
+#county_agency_count
+
+# counts up number of sheriffs and officers by county and also percent
+county_officer_count <- joined %>% 
+  filter(AGCYTYPE=="(000) Local police department" |
+           AGCYTYPE=="(001) Sheriff's office" ) %>% 
+  #  filter(year>2013) %>% 
+  group_by(year, FIPS, AGCYTYPE) %>% 
+  summarize(total_officers=sum(officers_total, na.rm=T)) %>% 
+  group_by(year, FIPS) %>% 
+  mutate(percent_officers=round(total_officers/sum(total_officers, na.rm=T)*100,2)) %>% 
+  pivot_wider(names_from="AGCYTYPE", values_from=c("total_officers", "percent_officers")) %>% 
+  rename(total_police_officers=`total_officers_(000) Local police department`,
+         total_sheriff_officers=`total_officers_(001) Sheriff's office`,
+         percent_police_officers=`percent_officers_(000) Local police department`,
+         percent_sheriff_officers=`percent_officers_(001) Sheriff's office`) 
+
+#county_officer_count 
+
+# calculates total arrests by police department or sheriffs agency by county each year
+# and percent
+county_arrests <- joined %>% 
+  filter(AGCYTYPE=="(000) Local police department" |
+           AGCYTYPE=="(001) Sheriff's office" ) %>% 
+  #  filter(year>2013) %>% 
+  group_by(year, FIPS, AGCYTYPE) %>% 
+  summarize(total_arrests=sum(arrests_all, na.rm=T)) %>% 
+  group_by(year, FIPS) %>% 
+  mutate(percent_arrests=round(total_arrests/sum(total_arrests, na.rm=T)*100,2)) %>% 
+  pivot_wider(names_from="AGCYTYPE", values_from=c("total_arrests", "percent_arrests")) %>% 
+  rename(total_police_arrests=`total_arrests_(000) Local police department`,
+         total_sheriff_arrests=`total_arrests_(001) Sheriff's office`,
+         percent_police_arrests=`percent_arrests_(000) Local police department`,
+         percent_sheriff_arrests=`percent_arrests_(001) Sheriff's office`,
+  )
+
+#county_arrests
+
+# joining all the data: officer counts and arrests by year and county
+# and calculating per capita (total_police_officers or total_sheriff_officers)
+county_annual <- county_agency_count %>% 
+  left_join(county_officer_count) %>% 
+  left_join(county_arrests) %>% 
+  mutate(per_police=round(total_police_arrests/total_police_officers,1),
+         per_deputy=round(total_sheriff_arrests/total_sheriff_officers,1))
+
+glimpse(county_annual)
+```
+
+```{r code7, eval=F, echo=F}
+g287 <- read_excel("../../data/raw_data/287g for Andrew.xlsx") %>% 
+  select(FIPS) %>% 
+  mutate(`287g`=T) %>% 
+  filter(!is.na(FIPS))
+
+### add fips data
+library(tidycensus)
+p2018 <- get_acs(geography="county", variables="B03002_001",
+                 geometry=F, survey="acs5", year=2018)
+p2018 <- p2018 %>% 
+  select(FIPS=GEOID, NAME) %>% 
+  left_join(g287)
+
+county_annual <- left_join(county_annual, p2018)
+
+# calculating arrests per 
+county_annual <- county_annual %>% 
+  group_by(year) %>% 
+  mutate(rank_per_capita_deputies = order(order(per_deputy, decreasing=TRUE)))
+
+glimpse(county_annual)
+#write_csv(county_annual, "../../outputs/summarized_data/county_annual_287g.csv", na="")
+```
+
+```{r code8, eval=F, echo=F}
+
+# looking only at 287g counties and ranking them
+county_annual_287g <- county_annual %>% 
+  filter(`287g`==T) %>% 
+  group_by(year) %>% 
+  mutate(rank_per_capita_deputies = order(order(per_deputy, decreasing=TRUE)))
+
+#write_csv(county_annual_287g, "outputs/summarized_data/county_annual_287g.csv", na="")
+
+#### counties_annual_rate -----
+
+counties_annual_rate <- joined %>% 
+  filter(AGCYTYPE=="(000) Local police department" |
+           AGCYTYPE=="(001) Sheriff's office" ) %>% 
+  #  filter(year>2013) %>% 
+  group_by(year, FIPS, AGCYTYPE) %>% 
+  summarize(agencies=n(),
+            officers_total=sum(officers_total, na.rm=T),
+            arrests_all=sum(arrests_all, na.rm=T), 
+            low_level_arrests=sum(low_level_arrests, na.rm=T)) %>% 
+  
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_officer=round(arrests_all/officers_total, 1),
+    arrests_low_per_officer=round(low_level_arrests/officers_total, 1),
+    percent_low=round(low_level_arrests/arrests_all*100, 2)) %>% 
+  
+  filter(officers_total!=0)
+
+
+##### agencies rated by year ----
+
+agencies_annual_rate <- joined %>% 
+  #  filter(year>2013) %>% 
+  select(year, ori, ncic_agency_name, agency_name_edit, agency_type_name,
+         state_abbr, FCOUNTY, FPLACE, FIPS, ORI7, NAME, UA,
+         STATENAME, COUNTYNAME, PARTOF, AGCYTYPE, SUBTYPE1, 
+         ADDRESS_STR1, ADDRESS_CITY, ADDRESS_STATE, ADDRESS_ZIP, 
+         CSLLEA08_ID, INTPTLAT, INTPTLONG,ice,
+         officers_total, arrests_all, low_level_arrests) %>% 
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_officer=round(arrests_all/officers_total, 1),
+    arrests_low_per_officer=round(low_level_arrests/officers_total, 1),
+    percent_low=round(low_level_arrests/arrests_all*100,2)) %>% 
+  filter(AGCYTYPE=="(000) Local police department" |
+           AGCYTYPE=="(001) Sheriff's office" ) %>% 
+  filter(officers_total!=0)
+```
+
+```{r code9}
+
+## every agency's arrests and employees since 2010 
+## and assessing low-level arrests per capita
+
+##### since 2010 summarized ----
+
+agency_summary <- joined %>% 
+  #filter(year>2013) %>% 
+  group_by(ori, ncic_agency_name, agency_name_edit, agency_type_name,
+           state_abbr, FCOUNTY, FPLACE, FIPS, ORI7, NAME, UA,
+           STATENAME, COUNTYNAME, PARTOF, AGCYTYPE, SUBTYPE1, 
+           ADDRESS_STR1, ADDRESS_CITY, ADDRESS_STATE, ADDRESS_ZIP, 
+           CSLLEA08_ID, INTPTLAT, INTPTLONG,ice) %>% 
+  summarize(officers_total=sum(officers_total, na.rm=T),
+            arrests_all=sum(arrests_all, na.rm=T), 
+            arressts_old=sum(arrests_old, na.rm=T),
+            low_level_arrests=sum(low_level_arrests, na.rm=T)) %>% 
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_officer=round(arrests_all/officers_total,1),
+    arrests_low_per_officer=round(low_level_arrests/officers_total,1),
+    percent_low=round(low_level_arrests/arrests_all*100,2)) %>% 
+  filter(AGCYTYPE=="(000) Local police department" |
+           AGCYTYPE=="(001) Sheriff's office" ) %>% 
+  filter(officers_total!=0)
+
+#write_csv(agency_summary, "outputs/summarized_data/agency_summary.csv", na="")
+
+glimpse(agency_summary)
+```
+
+```{r code10}
+## same as above but looking only at sheriffs agency in 287g
+agency_summary_287g <- agency_summary %>% 
+  filter(ice==T) %>% 
+  ungroup() %>% 
+  mutate(rank_arrests_low_per_officer = rank(-arrests_low_per_officer))
+
+agency_summary_287g %>% 
+  select(Agency=NAME, State=state_abbr, type=AGCYTYPE, ice, 
+         officers=officers_total, `low level arrests`=low_level_arrests,
+         `low level arrests per officer`=arrests_low_per_officer) %>% 
+  datatable()
+#write_csv(agency_summary_287g, "outputs/summarized_data/agency_summary_287g.csv", na="")
+```
+
+```{r code11}
+
+## urban / rural
+urb <- read_csv("../../data/raw_data/rural_urban_designations.csv") %>% 
+  select(FIPS=fips, x2013_code, county_category) %>% 
+  mutate(county_cat=case_when(
+    x2013_code==1 | x2013_code==2 ~ "Urban",
+    x2013_code==3 | x2013_code==4 ~ "Suburban",
+    x2013_code==5 | x2013_code==6 ~ "Rural"
+  ))
+```
+
+```{r code12}
+
+#### summary_agency_type ----
+summary_agency_type <- joined %>% 
+  #filter(year>2013) %>% 
+  filter(!is.na(total_police_employees)) %>% 
+  #filter(AGCYTYPE=="(001) Sheriff's office") %>% 
+  #group_by(AGCYTYPE, ice) %>% 
+  group_by(AGCYTYPE) %>% 
+  summarize(total=n(),
+            arrests_all=sum(arrests_all),
+            arrests_low=sum(low_level_arrests),
+            population=sum(population),
+            population2=sum(LG_POPULATION),
+            total_police = sum(total_police_employees),
+            officers_total = sum(officers_total)) %>% 
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_police=round(arrests_all/total_police,1),
+    arrests_per_officer=round(arrests_all/officers_total,1),
+    arrests_low_per_police=round(arrests_low/total_police,1),
+    arrests_low_per_officer=round(arrests_low/officers_total,1),
+    percent_low=round(arrests_low/arrests_all*100,2))
+
+summary_agency_type %>% 
+  select(type=AGCYTYPE,
+         agencies=total,
+         arrests=arrests_all,
+         `low level arrests`=arrests_low,
+         officers=officers_total,
+         `arrests per officer`=arrests_per_officer,
+         `low level arrests per officer`=arrests_low_per_officer) %>% 
+  datatable()
+```
+
+
+```{r code12b}
+
+#### summary_agency_type ----
+summary_agency_type <- joined %>% 
+  #filter(year>2013) %>% 
+  filter(!is.na(total_police_employees)) %>% 
+  #filter(AGCYTYPE=="(001) Sheriff's office") %>% 
+  #group_by(AGCYTYPE, ice) %>% 
+  group_by(AGCYTYPE, ice) %>% 
+  summarize(total=n(),
+            arrests_all=sum(arrests_all),
+            arrests_low=sum(low_level_arrests),
+            population=sum(population),
+            population2=sum(LG_POPULATION),
+            total_police = sum(total_police_employees),
+            officers_total = sum(officers_total)) %>% 
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_police=round(arrests_all/total_police,1),
+    arrests_per_officer=round(arrests_all/officers_total,1),
+    arrests_low_per_police=round(arrests_low/total_police,1),
+    arrests_low_per_officer=round(arrests_low/officers_total,1),
+    percent_low=round(arrests_low/arrests_all*100,2))
+
+summary_agency_type %>% 
+  #filter(AGCYTYPE=="(000) Local police department" |AGCYTYPE=="(001) Sheriff's office") %>% 
+  filter(AGCYTYPE=="(001) Sheriff's office") %>% 
+  select(type=AGCYTYPE,
+         ice,
+         agencies=total,
+         arrests=arrests_all,
+         `low level arrests`=arrests_low,
+         officers=officers_total,
+         `arrests per officer`=arrests_per_officer,
+         `low level arrests per officer`=arrests_low_per_officer) %>% 
+  datatable()
+```
+
+```{r code13, eval=F, echo=F}
+
+# sheriffs agencies rural/suburban/rural
+summary_agency_type3 <- joined %>% 
+  left_join(urb) %>% 
+  #filter(year>2013) %>% 
+  filter(!is.na(total_police_employees)) %>% 
+  filter(!is.na(arrests_all)) %>% 
+  
+  select(ori, AGCYTYPE, county_cat) %>% 
+  unique() %>% 
+  #filter(AGCYTYPE=="(001) Sheriff's office") %>% 
+  count(AGCYTYPE, county_cat) 
+
+summary_agency_type3
+```
+
+```{r code14, eval=F, echo=F}
+summary_agency_type_year <- joined %>% 
+  filter(!is.na(total_police_employees)) %>% 
+  group_by(year, AGCYTYPE, ice) %>% 
+  summarize(total=n(),
+            arrests_all=sum(arrests_all),
+            arrests_low=sum(low_level_arrests),
+            population=sum(population),
+            population2=sum(LG_POPULATION),
+            total_police = sum(total_police_employees),
+            officers_total = sum(officers_total)) %>% 
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_police=round(arrests_all/total_police,1),
+    arrests_per_officer=round(arrests_all/officers_total,1),
+    arrests_low_per_police=round(arrests_low/total_police,1),
+    arrests_low_per_officer=round(arrests_low/officers_total,1),
+    percent_low=round(arrests_low/arrests_all*100,2))
+
+
+summary_agency_type_year_sheriff <- joined %>% 
+  filter(!is.na(total_police_employees)) %>% 
+  group_by(year, AGCYTYPE, ice) %>% 
+  summarize(total=n(),
+            arrests_all=sum(arrests_all),
+            arrests_low=sum(low_level_arrests),
+            population=sum(population),
+            population2=sum(LG_POPULATION),
+            total_police = sum(total_police_employees),
+            officers_total = sum(officers_total)) %>% 
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_police=round(arrests_all/total_police,1),
+    arrests_per_officer=round(arrests_all/officers_total,1),
+    arrests_low_per_police=round(arrests_low/total_police,1),
+    arrests_low_per_officer=round(arrests_low/officers_total,1),
+    percent_low=round(arrests_low/arrests_all*100,2)) %>% 
+  filter(AGCYTYPE=="(001) Sheriff's office")
+
+
+summary_agency_type_year_sheriff %>% 
+  #ggplot(aes(x=year, y=arrests_per_officer)) +
+  #ggplot(aes(x=year, y=arrests_low_per_officer)) +
+  ggplot(aes(x=year, y=percent_low)) +
+  geom_col() +
+  facet_wrap(~ice)
+
+summary_agency_type2 <- joined %>%
+  left_join(urb) %>%
+  #filter(year>2013) %>%
+  filter(!is.na(total_police_employees)) %>%
+  #filter(AGCYTYPE=="(001) Sheriff's office") %>%
+  group_by(AGCYTYPE, county_cat) %>%
+  #group_by(AGCYTYPE, ice) %>%
+  #group_by(county_cat) %>%
+  summarize(total=n(),
+            arrests_all=sum(arrests_all),
+            arrests_low=sum(low_level_arrests),
+            population=sum(population),
+            population2=sum(LG_POPULATION),
+            total_police = sum(total_police_employees),
+            officers_total = sum(officers_total)) %>%
+  mutate(#arrests_per_pop=round(arrests/population*1000),
+    #arrests_per_pop2=round(arrests/population2*1000000),
+    arrests_per_police=round(arrests_all/total_police,1),
+    arrests_per_officer=round(arrests_all/officers_total,1),
+    arrests_low_per_police=round(arrests_low/total_police,1),
+    arrests_low_per_officer=round(arrests_low/officers_total,1),
+    percent_low=round(arrests_low/arrests_all*100,2))
+```
+
+```{r code15, eval=F, echo=F}
+
+#library(tidyverse)
+#agencies.coded %>% 
+#  count(V10)
+
+
+## FOR TED
+
+summary_agency_type2 %>% ungroup() %>% summarize(sum(arrests_all)) #82300474
+```
+
+```{r code15b, eval=F, echo=F}
+summary_agency_type2 %>% group_by(AGCYTYPE) %>% summarize(sum(arrests_all)) #19% 15624803/82300474
+summary_agency_type2 %>% ungroup() %>% summarize(sum(arrests_low))
+#35010919
+summary_agency_type2 %>% group_by(AGCYTYPE) %>% summarize(sum(arrests_low))
+#7550644/35010919 #22%
+
+summary_agency_type2 %>% filter(county_cat=="Rural") %>% ungroup() %>% summarize(sum(arrests_all))
+#13160392
+summary_agency_type2 %>% filter(county_cat=="Rural") %>% group_by(AGCYTYPE) %>% summarize(sum(arrests_all))
+#4380447/13160392
+summary_agency_type2 %>% filter(county_cat=="Rural") %>% ungroup() %>% summarize(sum(arrests_low))
+#13160392
+summary_agency_type2 %>% filter(county_cat=="Rural") %>% group_by(AGCYTYPE) %>% summarize(sum(arrests_low))
+#2217356/6157255
+
+#33 percent of all rural arrests are made by sheriffs departments
+#36 percent all low level
+
+summary_agency_type3 %>% group_by(AGCYTYPE) %>% summarize(sum(n))
+summary_agency_type3 %>% filter(county_cat=="Rural") %>% summarize(sum(n))
+summary_agency_type3 %>% filter(county_cat=="Rural") %>% group_by(AGCYTYPE) %>% 
+  summarize(sum(n))
+```
