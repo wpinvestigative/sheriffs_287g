@@ -22,8 +22,6 @@ Special thanks to Aaron Littman and Jacob Kaplan for advice in working with UCR 
 
 * **[scripts/import](scripts/import)** - Scripts to import FBI UCR data via API
 
-* **[scripts/analysis](scripts/analysis)** - Scripts for analysis
-
 * **[outputs/findings](https://github.com/wpinvestigative/sheriffs_287g/tree/main/outputs/findings)** - Exploratory notebooks
 
 # Notebooks
