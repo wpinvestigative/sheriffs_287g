@@ -11,6 +11,7 @@ data/raw_data/ucr_agencies_employees_2018.csv
 data/raw_data/rural_urban_designations.csv
 outputs/summarized_data/
 data/raw_data/ICPSR_35158/
+scripts/analysis/01_exploratory.R
 
 # .ds_store
 .DS_Store
