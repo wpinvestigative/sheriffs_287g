@@ -190,5 +190,5 @@ for (i in 1:nrow(agencies)) {
 }
 
 employees_df <- unique(employees_df)
-write_csv(employees_df, "raw_data/ucr_agencies_employees.csv", na="")
+write_csv(employees_df, "data/raw_data/ucr_agencies_employees.csv", na="")
 

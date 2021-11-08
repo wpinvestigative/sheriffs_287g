@@ -177,7 +177,7 @@ joined <- joined %>%
   )
 ```
 
-Loading in relationship file for sheriff's agencies that particpated in the 287(g) program. Here's a slice of what the data looks like:
+Loading in relationship file for sheriff's agencies that participated in the 287(g) program. Here's a slice of what the data looks like:
 
 ```{r ice_import}
 
@@ -292,7 +292,7 @@ What's the percent of agencies who participated?
 
 ```{r summary1}
 
-# counting up Sheriff's Office Agencies in data set post-2018
+# counting up Sheriff's Office Agencies in data set post-2008
 joined2_count <- joined %>% 
   filter(year>=2008) %>% 
   filter(!is.na(total_police_employees)) %>% 
@@ -716,8 +716,8 @@ What's the median rate increase after participating (through 2018 because only d
 
 ```{r summary12b}
 # what's the median rate increase after joining
-round(mean(summary_agency_type_annual6$join_change, na.rm=T),2)
-# +3
+round(median(summary_agency_type_annual6$join_change, na.rm=T),2)
+# +1.25
 
 ```
 
