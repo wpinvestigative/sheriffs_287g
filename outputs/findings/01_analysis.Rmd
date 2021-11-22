@@ -184,7 +184,8 @@ Loading in relationship file for sheriff's agencies that participated in the 287
 # load in relationship file for 287g sheriffs agencies
 # has ori codes and years of participation
 # breaks out agencies by year and participation
-ice <- read_excel("../../data/raw_data/287g_curated.xlsx", sheet=1) %>% 
+ice <- read_excel("../../data/raw_data/287g_curated_2019.xlsx", sheet=1) %>% 
+#ice <- read_excel("../../data/raw_data/287g_curated.xlsx", sheet=1) %>% 
   filter(!is.na(ori)) %>% 
   filter(County!="Butler County Sheriff's Office") 
 
@@ -219,7 +220,8 @@ ice <- ice %>%
 
 # loads in the same data as above but 
 # marks if they've ever participated in 287g
-ice2 <- read_excel("../../data/raw_data/287g_curated.xlsx", sheet=1) %>% 
+ice2 <- read_excel("../../data/raw_data/287g_curated_2019.xlsx", sheet=1) %>% 
+#ice2 <- read_excel("../../data/raw_data/287g_curated.xlsx", sheet=1) %>% 
   filter(!is.na(ori)) %>% 
   filter(County!="Butler County Sheriff's Office") %>% 
   mutate(ori=case_when(
