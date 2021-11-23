@@ -2,9 +2,7 @@
 
 # About this story
 
-[TK TK ](https://www.washingtonpost.com/)
-
-Summary TK
+[Under Trump, ICE aggressively recruited sheriffs as partners to question and detain undocumented immigrants](https://www.washingtonpost.com/)
 
 # Methodology
 

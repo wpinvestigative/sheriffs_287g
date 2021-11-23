@@ -6,6 +6,8 @@ output:
     code_folding: hide
 ---
 
+[Under Trump, ICE aggressively recruited sheriffs as partners to question and detain undocumented immigrants](https://www.washingtonpost.com/)
+
 To see R analysis code and comments, click **Code > Show All Code ** at the top right.
 
 ```{r setup, include=FALSE}
